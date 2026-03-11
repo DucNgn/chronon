@@ -742,7 +742,7 @@ object EmrSubmitter {
       flinkEksNamespace = sys.env.get("FLINK_EKS_NAMESPACE"),
       eksClusterName = sys.env.get("EKS_CLUSTER_NAME"),
       ingressBaseUrl = ingressBaseUrl,
-      logsBucketPrefix = logsBucketPrefix,
+      logsBucketPrefix = logsBucketPrefix
     )
   }
 
