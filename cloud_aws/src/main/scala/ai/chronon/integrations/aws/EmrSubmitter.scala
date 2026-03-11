@@ -36,8 +36,11 @@ class EmrSubmitter(customerId: String,
                    flinkEksServiceAccount: Option[String] = None,
                    flinkEksNamespace: Option[String] = None,
                    eksClusterName: Option[String] = None,
-                   ingressBaseUrl: Option[String] = None)
+                   ingressBaseUrl: Option[String] = None,
+                   logsBucketPrefix: Option[String] = None)
     extends JobSubmitter {
+
+  private val resolvedLogsBucket = logsBucketPrefix.getOrElse(s"s3://zipline-logs-$customerId")
 
   private val ClusterApplications = List(
     "Flink",
@@ -156,8 +159,7 @@ class EmrSubmitter(customerId: String,
           .build()
       )
       .applications(ClusterApplications.map(app => Application.builder().name(app).build()): _*)
-      // TODO: Could make this generalizable. or use a separate logs bucket
-      .logUri(s"s3://zipline-logs-${customerId}/emr/")
+      .logUri(s"$resolvedLogsBucket/emr/")
       .instances(
         JobFlowInstancesConfig
           .builder()
@@ -728,6 +730,7 @@ object EmrSubmitter {
     val customerId = sys.env.getOrElse("CUSTOMER_ID", throw new Exception("CUSTOMER_ID not set")).toLowerCase
     val awsRegion = sys.env.getOrElse("AWS_REGION", sys.env.getOrElse("AWS_DEFAULT_REGION", ""))
     val ingressBaseUrl = sys.env.get("HUB_BASE_URL")
+    val logsBucketPrefix = sys.env.get("ZIPLINE_LOGS_BUCKET_PREFIX")
 
     new EmrSubmitter(
       customerId,
@@ -738,7 +741,8 @@ object EmrSubmitter {
       flinkEksServiceAccount = sys.env.get("FLINK_EKS_SERVICE_ACCOUNT"),
       flinkEksNamespace = sys.env.get("FLINK_EKS_NAMESPACE"),
       eksClusterName = sys.env.get("EKS_CLUSTER_NAME"),
-      ingressBaseUrl = ingressBaseUrl
+      ingressBaseUrl = ingressBaseUrl,
+      logsBucketPrefix = logsBucketPrefix,
     )
   }
 

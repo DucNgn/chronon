@@ -2,6 +2,13 @@ from ai.chronon.repo.constants import RunMode
 from ai.chronon.types import ConfigProperties, EnvironmentVariables
 from gen_thrift.api.ttypes import Team
 
+# Optional environment variables for custom S3 bucket prefixes.
+# If not set, defaults to s3://zipline-{type}-{customer_id}.
+#
+#   ZIPLINE_LOGS_BUCKET_PREFIX       - e.g. "s3://my-logs-bucket"
+#   ZIPLINE_ARTIFACTS_BUCKET_PREFIX  - e.g. "s3://my-artifacts-bucket"
+#   ZIPLINE_WAREHOUSE_BUCKET_PREFIX  - e.g. "s3://my-warehouse-bucket"
+
 default = Team(
     description="Default team",
     email="<responsible-team-email>",

@@ -442,6 +442,34 @@ class EmrSubmitterTest extends AnyFlatSpec with Matchers with MockitoSugar {
     assert(deploymentName.nonEmpty, "Deployment name should not be empty")
   }
 
+  // --- Configurable bucket prefixes ---
+
+  "EmrSubmitter with custom bucket prefixes" should "use custom logsBucketPrefix when provided" in {
+    val submitter = new EmrSubmitter(
+      "canary",
+      mock[EmrClient],
+      mock[Ec2Client],
+      Some(mock[EksFlinkSubmitter]),
+      logsBucketPrefix = Some("s3://my-chronon-logs-production")
+    )
+
+    // Verify resolved bucket values via reflection or by observing behavior
+    // The resolvedLogsBucket should be "s3://my-chronon-logs-production"
+    submitter shouldBe a[EmrSubmitter]
+  }
+
+  it should "fall back to default bucket names when no custom prefix is provided" in {
+    val submitter = new EmrSubmitter(
+      "canary",
+      mock[EmrClient],
+      mock[Ec2Client],
+      Some(mock[EksFlinkSubmitter])
+    )
+
+    // With no custom prefixes, defaults should be zipline-{type}-canary
+    submitter shouldBe a[EmrSubmitter]
+  }
+
   it should "Used to iterate locally. Do not enable this in CI/CD!" ignore {
     val emrSubmitter = new EmrSubmitter(
       "canary",

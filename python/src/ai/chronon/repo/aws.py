@@ -53,7 +53,10 @@ class AwsRunner(Runner):
         s3_client = boto3.client("s3")
         destination_path = f"{destination_dir}/{jar_name}"
         source_key_name = f"release/{version}/jars/{jar_name}"
-        bucket_name = f"zipline-artifacts-{customer_id}"
+        artifacts_prefix = os.environ.get(
+            "ZIPLINE_ARTIFACTS_BUCKET_PREFIX", f"s3://zipline-artifacts-{customer_id}"
+        )
+        bucket_name = artifacts_prefix.replace("s3://", "").split("/")[0]
 
         are_identical = (
             AwsRunner.compare_s3_and_local_file_hashes(
@@ -124,30 +127,33 @@ class AwsRunner(Runner):
         job_type: JobType = JobType.SPARK,
         local_files_to_upload: List[str] = None,
     ):
-        customer_warehouse_bucket_name = f"zipline-warehouse-{get_customer_id()}"
+        warehouse_bucket_prefix = os.environ.get(
+            "ZIPLINE_WAREHOUSE_BUCKET_PREFIX", f"s3://zipline-warehouse-{get_customer_id()}"
+        )
+        artifacts_bucket_prefix = os.environ.get(
+            "ZIPLINE_ARTIFACTS_BUCKET_PREFIX", f"s3://zipline-artifacts-{get_customer_id()}"
+        )
         s3_files = []
         for source_file in local_files_to_upload:
             # upload to `metadata` folder
             destination_file_path = f"metadata/{extract_filename_from_path(source_file)}"
             s3_files.append(
                 upload_to_blob_store(
-                    source_file, f"s3://{customer_warehouse_bucket_name}/{destination_file_path}"
+                    source_file, f"{warehouse_bucket_prefix}/{destination_file_path}"
                 )
             )
 
         # we also want the additional-confs included here. it should already be in the bucket
 
-        zipline_artifacts_bucket_prefix = "s3://zipline-artifacts"
-
         s3_files.append(
-            f"{zipline_artifacts_bucket_prefix}-{get_customer_id()}/confs/additional-confs.yaml"
+            f"{artifacts_bucket_prefix}/confs/additional-confs.yaml"
         )
 
         s3_file_args = ",".join(s3_files)
 
         # include jar uri. should also already be in the bucket
         jar_uri = (
-            f"{zipline_artifacts_bucket_prefix}-{get_customer_id()}"
+            f"{artifacts_bucket_prefix}"
             + f"/release/{self.version}/jars/{ZIPLINE_AWS_JAR_DEFAULT}"
         )
 
@@ -158,7 +164,7 @@ class AwsRunner(Runner):
         if job_type == JobType.FLINK:
             main_class = "ai.chronon.flink.FlinkJob"
             flink_jar_uri = (
-                f"{zipline_artifacts_bucket_prefix}-{get_customer_id()}"
+                f"{artifacts_bucket_prefix}"
                 + f"/jars/{ZIPLINE_AWS_FLINK_JAR_DEFAULT}"
             )
             return (
