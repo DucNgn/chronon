@@ -56,7 +56,10 @@ class AwsRunner(Runner):
         artifacts_prefix = os.environ.get(
             "ZIPLINE_ARTIFACTS_BUCKET_PREFIX", f"s3://zipline-artifacts-{customer_id}"
         )
-        bucket_name = artifacts_prefix.replace("s3://", "").split("/")[0]
+        parsed = artifacts_prefix.replace("s3://", "").split("/", 1)
+        bucket_name = parsed[0]
+        path_prefix = parsed[1].rstrip("/") + "/" if len(parsed) > 1 and parsed[1] else ""
+        source_key_name = f"{path_prefix}release/{version}/jars/{jar_name}"
 
         are_identical = (
             AwsRunner.compare_s3_and_local_file_hashes(
