@@ -8,6 +8,7 @@ import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, Sch
 import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException
 import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema
 import java.nio.ByteBuffer
+import scala.jdk.CollectionConverters._
 
 /** Schema Provider / SerDe implementation that uses the Confluent Schema Registry to fetch schemas for topics.
   * Supports both Avro and Protobuf schemas.
@@ -17,7 +18,8 @@ import java.nio.ByteBuffer
   * forwards to the right host + port. Scheme defaults to http. Subject defaults to the topic name + "-value" (based on schema
   * registry conventions).
   */
-class SchemaRegistrySerDe(topicInfo: TopicInfo) extends SerDe {
+class SchemaRegistrySerDe(topicInfo: TopicInfo, getEnv: String => Option[String] = key => Option(System.getenv(key)))
+    extends SerDe {
   import SchemaRegistrySerDe._
 
   private val schemaRegistryHost: String =
@@ -40,14 +42,12 @@ class SchemaRegistrySerDe(topicInfo: TopicInfo) extends SerDe {
   protected[flink] def buildSchemaRegistryClient(schemeString: String,
                                                  registryHost: String,
                                                  maybePortString: Option[String]): SchemaRegistryClient = {
-    maybePortString match {
-      case Some(portString) =>
-        val registryUrl = s"$schemeString://$registryHost:$portString"
-        new CachedSchemaRegistryClient(registryUrl, CacheCapacity)
-      case None =>
-        val registryUrl = s"$schemeString://$registryHost"
-        new CachedSchemaRegistryClient(registryUrl, CacheCapacity)
+    val registryUrl = maybePortString match {
+      case Some(portString) => s"$schemeString://$registryHost:$portString"
+      case None             => s"$schemeString://$registryHost"
     }
+    val authConfig = resolveRegistryAuthConfig(topicInfo.params, getEnv)
+    new CachedSchemaRegistryClient(registryUrl, CacheCapacity, authConfig.asJava)
   }
 
   @transient private lazy val schemaRegistryClient: SchemaRegistryClient =
@@ -115,4 +115,28 @@ object SchemaRegistrySerDe {
   val RegistrySubjectKey = "subject"
   val SchemaRegistryWireFormat = "schema_registry_wire_format"
   val Proto3DefaultAsNullKey = "proto3_default_as_null"
+
+  val BasicAuthCredentialsSourceKey = "basic.auth.credentials.source"
+  val BasicAuthUserInfoKey = "basic.auth.user.info"
+  val BasicAuthUserInfoEnvVar = "SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO"
+
+  /** Resolve Schema Registry auth config from topic params and environment variables.
+    * If `basic.auth.credentials.source` is set but `basic.auth.user.info` is not,
+    * falls back to the SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO env var.
+    */
+  def resolveRegistryAuthConfig(params: Map[String, String],
+                                getEnv: String => Option[String]): Map[String, String] = {
+    val hasCredentialsSource = params.get(BasicAuthCredentialsSourceKey).exists(_.trim.nonEmpty)
+    if (!hasCredentialsSource) return Map.empty
+
+    val base = Map(BasicAuthCredentialsSourceKey -> params(BasicAuthCredentialsSourceKey).trim)
+    if (params.get(BasicAuthUserInfoKey).exists(_.trim.nonEmpty)) {
+      return base + (BasicAuthUserInfoKey -> params(BasicAuthUserInfoKey).trim)
+    }
+
+    getEnv(BasicAuthUserInfoEnvVar) match {
+      case Some(userInfo) if userInfo.trim.nonEmpty => base + (BasicAuthUserInfoKey -> userInfo.trim)
+      case _                                       => base
+    }
+  }
 }
