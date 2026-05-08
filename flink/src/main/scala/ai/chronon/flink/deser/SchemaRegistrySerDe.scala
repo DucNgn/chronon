@@ -126,8 +126,7 @@ object SchemaRegistrySerDe {
     * If `basic.auth.credentials.source` is set but `basic.auth.user.info` is not,
     * falls back to the SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO env var.
     */
-  def resolveRegistryAuthConfig(params: Map[String, String],
-                                getEnv: String => Option[String]): Map[String, String] = {
+  def resolveRegistryAuthConfig(params: Map[String, String], getEnv: String => Option[String]): Map[String, String] = {
     val hasCredentialsSource = params.get(BasicAuthCredentialsSourceKey).exists(_.trim.nonEmpty)
     if (!hasCredentialsSource) return Map.empty
 
@@ -138,7 +137,7 @@ object SchemaRegistrySerDe {
 
     getEnv(BasicAuthUserInfoEnvVar) match {
       case Some(userInfo) if userInfo.trim.nonEmpty => base + (BasicAuthUserInfoKey -> userInfo.trim)
-      case _                                       => base
+      case _                                        => base
     }
   }
 }
