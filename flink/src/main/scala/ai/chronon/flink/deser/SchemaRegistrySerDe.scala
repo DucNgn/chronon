@@ -13,13 +13,15 @@ import scala.jdk.CollectionConverters._
 /** Schema Provider / SerDe implementation that uses the Confluent Schema Registry to fetch schemas for topics.
   * Supports both Avro and Protobuf schemas.
   *
-  * Can be configured as: topic = "kafka://topic-name/registry_host=host/[registry_port=port]/[registry_scheme=http]/[subject=subject]/[proto3_default_as_null=false]"
-  * Port, scheme and subject are optional. If port is missing, we assume the host is pointing to a LB address / such that
-  * forwards to the right host + port. Scheme defaults to http. Subject defaults to the topic name + "-value" (based on schema
-  * registry conventions).
+  * Can be configured as: topic = "kafka://topic-name/registry_host=host/[registry_port=port]/[registry_scheme=http]/[subject=subject]/[proto3_default_as_null=false]/[basic.auth.credentials.source=USER_INFO]"
+  * Port, scheme, subject, and basic auth params are optional. If port is missing, we assume the host is pointing to a
+  * LB address / such that forwards to the right host + port. Scheme defaults to http. Subject defaults to the topic
+  * name + "-value" (based on schema registry conventions).
+  *
+  * For authenticated registries, set `basic.auth.credentials.source=USER_INFO` in the topic URI params and provide
+  * credentials via the `SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO` env var (or `basic.auth.user.info` in topic params).
   */
-class SchemaRegistrySerDe(topicInfo: TopicInfo, getEnv: String => Option[String] = key => Option(System.getenv(key)))
-    extends SerDe {
+class SchemaRegistrySerDe(topicInfo: TopicInfo) extends SerDe {
   import SchemaRegistrySerDe._
 
   private val schemaRegistryHost: String =
@@ -46,7 +48,7 @@ class SchemaRegistrySerDe(topicInfo: TopicInfo, getEnv: String => Option[String]
       case Some(portString) => s"$schemeString://$registryHost:$portString"
       case None             => s"$schemeString://$registryHost"
     }
-    val authConfig = resolveRegistryAuthConfig(topicInfo.params, getEnv)
+    val authConfig = resolveRegistryAuthConfig(topicInfo.params, key => Option(System.getenv(key)))
     new CachedSchemaRegistryClient(registryUrl, CacheCapacity, authConfig.asJava)
   }
 

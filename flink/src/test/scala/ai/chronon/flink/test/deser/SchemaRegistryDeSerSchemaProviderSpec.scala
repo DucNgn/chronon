@@ -17,9 +17,8 @@ import java.nio.ByteBuffer
 import scala.jdk.CollectionConverters._
 
 class MockSchemaRegistrySerDe(topicInfo: TopicInfo,
-                             mockSchemaRegistryClient: MockSchemaRegistryClient,
-                             getEnv: String => Option[String] = _ => None)
-    extends SchemaRegistrySerDe(topicInfo, getEnv) {
+                             mockSchemaRegistryClient: MockSchemaRegistryClient)
+    extends SchemaRegistrySerDe(topicInfo) {
   override def buildSchemaRegistryClient(schemeString: String,
                                          registryHost: String,
                                          maybePortString: Option[String]): MockSchemaRegistryClient =
