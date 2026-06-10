@@ -247,8 +247,10 @@ object FlinkJob {
                             servingInfo: GroupByServingInfoParsed,
                             enableDebug: Boolean = false,
                             maybeTopicOverride: Option[String] = None): BaseFlinkJob = {
-    // Check if this is a JoinSource GroupBy
-    if (servingInfo.groupBy.streamingSource.get.isSetJoinSource) {
+    // streamingSource is None when no source has a topic set (e.g. topic
+    // provided only via --topic-override). Default to regular GroupBy path.
+    val isJoinSource = servingInfo.groupBy.streamingSource.exists(_.isSetJoinSource)
+    if (isJoinSource) {
       buildJoinSourceFlinkJob(groupByName, props, api, servingInfo, enableDebug, maybeTopicOverride)
     } else {
       buildGroupByStreamingJob(groupByName, props, api, servingInfo, enableDebug, maybeTopicOverride)
@@ -329,7 +331,13 @@ object FlinkJob {
                                        maybeTopicOverride: Option[String] = None): FlinkGroupByStreamingJob = {
     val logger = LoggerFactory.getLogger(getClass)
 
-    val rawTopic = maybeTopicOverride.getOrElse(servingInfo.groupBy.streamingSource.get.topic)
+    val rawTopic = maybeTopicOverride
+      .orElse(servingInfo.groupBy.streamingSource.map(_.topic))
+      .getOrElse(
+        throw new IllegalArgumentException(
+          s"No topic available for GroupBy '$groupByName'. Either set a topic on the EventSource " +
+            s"in the feature definition, or provide --topic-override at deploy time.")
+      )
     val topicInfo = TopicInfo.parse(rawTopic)
     val schemaProvider = FlinkSerDeProvider.build(topicInfo)
 
